@@ -1,5 +1,5 @@
 /*!
-Hype Sticky Scroll 1.0.2
+Hype Sticky Scroll 1.0.3
 Copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 
@@ -8,6 +8,7 @@ Copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.0.0 Initial release under MIT-license
 * 1.0.1 Modernized code and cleanup 
 * 1.0.2 Added a way to ignore scenes and callbacks
+* 1.0.3 Added function callbacks stickyScrollBefore and stickyScrollAfter
 */
 
 if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (function () {
@@ -176,13 +177,13 @@ if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (func
                         // Trigger custom behavior 
                         if (percentage === 0) {
                             hypeDocument.triggerCustomBehaviorNamed('stickyScrollBefore');
-                            if (hypeDocument.function()['stickyScrollBefore'] !== undefined) {
-                                hypeDocument.function()['stickyScrollBefore'](hypeDocument, element, event);
+                            if (hypeDocument.functions()['stickyScrollBefore'] !== undefined) {
+                                hypeDocument.functions()['stickyScrollBefore'](hypeDocument, element, event);
                             }
                         } else if (percentage === 1) {
                             hypeDocument.triggerCustomBehaviorNamed('stickyScrollAfter');
-                            if (hypeDocument.function()['stickyScrollAfter'] !== undefined) {
-                                hypeDocument.function()['stickyScrollAfter'](hypeDocument, element, event);
+                            if (hypeDocument.functions()['stickyScrollAfter'] !== undefined) {
+                                hypeDocument.functions()['stickyScrollAfter'](hypeDocument, element, event);
                             }
                         }
                     }
@@ -327,7 +328,7 @@ if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (func
          * @property {String} version Version of the extension
          */
         var HypeStickyScroll = {
-            version: '1.0.2',
+            version: '1.0.3',
             getDefault: getDefault,
 		    setDefault: setDefault,
         };
