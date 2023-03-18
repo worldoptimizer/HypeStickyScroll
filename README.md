@@ -15,7 +15,7 @@ Learn how to use the latest extension version and how to combine extensions into
 ---
 
 
-# Hype Sticky Scroll Extension
+# Documentation
 
 The Hype Sticky Scroll extension allows you to create a sticky scroll effect in your Tumult Hype projects. The extension provides an easy way to control the scroll progress and switch between scenes within a Hype document.
 
