@@ -81,6 +81,6 @@ Replace `sceneName` with the name of the scene you want to scroll to, `duration`
 
 | Command      | Description |
 |--------------|-------------|
-| `setDefault` | Sets a default value for a specified key or overrides all default values at once. |
-| `getDefault` | Returns the value of a default by key or all default values if no key is given. |
-| `version`    | The version of the Hype Sticky Scroll extension. |
+| `HypeStickyScroll.setDefault` | Sets a default value for a specified key or overrides all default values at once. |
+| `HypeStickyScroll.getDefault` | Returns the value of a default by key or all default values if no key is given. |
+| `HypeStickyScroll.version`    | The version of the Hype Sticky Scroll extension. |
