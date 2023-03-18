@@ -10,10 +10,9 @@ Copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.0.2 Added a way to ignore scenes and callbacks
 */
 
-if ("HypeStickyScroll" in window === false) {
-    window['HypeStickyScroll'] = (function () {
-
-        const _default = {
+if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (function () {
+        // defaults
+        let _default = {
             ignoreSceneSymbol: '🔒',
             wrapperHeight: 5000,
         };
