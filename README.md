@@ -1,5 +1,15 @@
 # HypeStickyScroll
-Make a Hype widget sticky in a container
+![](https://playground.maxziebell.de/Hype/StickyScroll/HypeStickyScroll.jpg)
+
+Introducing Hype Sticky Scroll, a powerful and versatile tool that unlocks the potential of scroll-driven animations in your Tumult Hype projects. With this plugin, create seamless and engaging scroll-based experiences that respond dynamically to user interactions.
+
+Key features include:
+
+* Scene filtering and ignoring: Choose which scenes to include or exclude from the sticky scroll animation (just add 🔒 to the scene name).
+* Customizable wrapper height: Adjust the height of the wrapper to fit your content and design.
+* Function callbacks: Implement custom behaviors with the stickyScrollBefore and stickyScrollAfter callbacks.
+* Progress tracking: Monitor the scroll progress and use it to control the playback of your animations (easier method in the works).
+* Smooth scene navigation: Scroll to specific scenes with ease, complete with customizable durations and easing options.
 
 ## Content Delivery Network (CDN)
 Latest version can be linked into your project using the following in the head section of your project:
