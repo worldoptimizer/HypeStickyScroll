@@ -1,4 +1,4 @@
-# HypeStickyScroll
+# Hype Sticky Scroll
 ![](https://playground.maxziebell.de/Hype/StickyScroll/HypeStickyScroll.jpg)
 
 Introducing Hype Sticky Scroll, a powerful and versatile tool that unlocks the potential of scroll-driven animations in your Tumult Hype projects. With this plugin, create seamless and engaging scroll-based experiences that respond dynamically to user interactions.
