@@ -1,5 +1,5 @@
 /*!
-Hype Sticky Scroll 1.0.3
+Hype Sticky Scroll 1.0.4
 Copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 
@@ -9,6 +9,7 @@ Copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.0.1 Modernized code and cleanup 
 * 1.0.2 Added a way to ignore scenes and callbacks
 * 1.0.3 Added function callbacks stickyScrollBefore and stickyScrollAfter
+* 1.0.4 HypeDocumentLoad set to push on HYPE_eventListeners (instead of unshift)
 */
 
 if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (function () {
@@ -254,7 +255,7 @@ if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (func
         }
 
         if ("HYPE_eventListeners" in window === false) { window.HYPE_eventListeners = Array(); }
-        window.HYPE_eventListeners.unshift({type: "HypeDocumentLoad", callback: HypeDocumentLoad});
+        window.HYPE_eventListeners.push({type: "HypeDocumentLoad", callback: HypeDocumentLoad});
         window.HYPE_eventListeners.push({ type: "HypeSceneLoad", callback: HypeSceneLoad});
        
         /**
