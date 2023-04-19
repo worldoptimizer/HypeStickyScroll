@@ -329,7 +329,7 @@ if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (func
          * @property {String} version Version of the extension
          */
         var HypeStickyScroll = {
-            version: '1.0.3',
+            version: '1.0.4',
             getDefault: getDefault,
 		    setDefault: setDefault,
         };
