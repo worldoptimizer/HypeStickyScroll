@@ -10,6 +10,7 @@ Key features include:
 * **Function callbacks**: Implement custom behaviors with the stickyScrollBefore and stickyScrollAfter callbacks.
 * **Progress tracking**: Monitor the scroll progress and control playback of your animations.
 * **Smooth scene navigation**: Scroll to specific scenes or progress values with customizable durations, easing, and offsets.
+* **Scene-time navigation**: Scroll to specific timeline positions within scenes for precise animation control.
 * **Lenis smooth scroll integration**: Optional support for buttery-smooth scrolling with Lenis library.
 * **Auto-scroll speed control**: Configurable automatic scroll duration based on distance.
 
@@ -112,6 +113,30 @@ hypeDocument.scrollToSceneStart('Scene 3', {
 });
 ```
 
+**Q: How can I scroll to a specific time within a scene?**
+
+A: You can scroll to a specific timeline position within a scene using the `scrollToSceneTime` function:
+
+```javascript
+// Instant scroll to 3.5 seconds into Scene 2
+hypeDocument.scrollToSceneTime('Scene 2', 3.5);
+
+// Animated scroll with options
+hypeDocument.scrollToSceneTime('Scene 2', 3.5, {
+    duration: 1.5,
+    easing: 'inout',
+    offset: 0.05
+});
+```
+
+You can also get the progress value for any scene and time:
+
+```javascript
+// Get progress for Scene 2 at 3.5 seconds
+const progress = hypeDocument.getProgressFromSceneTime('Scene 2', 3.5);
+console.log(progress); // e.g., 0.45
+```
+
 **Q: How do I use Lenis smooth scrolling?**
 
 A: First, load the Lenis library, then use the simple setup function:
@@ -157,12 +182,14 @@ HypeStickyScroll.setDefault('autoScrollSpeed', 0.5); // 500px/s (slower)
 | `hypeDocument.disableStickyScroll()` | Disables the sticky scroll effect. |
 | `hypeDocument.getProgress()` | Returns the current scroll progress (0-1). |
 | `hypeDocument.getScrollFromProgress(progress)` | Returns the scroll position for a given progress value. |
+| `hypeDocument.getProgressFromSceneTime(sceneName, timeInScene)` | Returns the progress value for a specific scene and timeline time. |
 | `hypeDocument.scrollToProgress(progress, options)` | Scrolls to a specific progress value (0-1) with optional duration, easing, and offset. |
 | `hypeDocument.scrollToSceneStart(sceneName, options)` | Scrolls to the start of a scene with optional duration, easing, and offset. |
+| `hypeDocument.scrollToSceneTime(sceneName, timeInScene, options)` | Scrolls to a specific timeline time within a scene with optional duration, easing, and offset. |
 
 ### Options Object
 
-Both `scrollToProgress` and `scrollToSceneStart` accept an options object:
+All scroll functions (`scrollToProgress`, `scrollToSceneStart`, and `scrollToSceneTime`) accept an options object:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|

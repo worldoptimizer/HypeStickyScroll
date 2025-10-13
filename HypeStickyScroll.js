@@ -1,5 +1,5 @@
 /*!
-Hype Sticky Scroll 1.1.0
+Hype Sticky Scroll 1.2.0
 Copyright (c) 2022-2025 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 
@@ -16,6 +16,7 @@ Copyright (c) 2022-2025 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.0.8 Added autoScrollSpeed setting and improved scroll animation comments
 * 1.0.9 Changed duration parameter from milliseconds to seconds for consistency
 * 1.1.0 Added Lenis smooth scroll support with auto-detection and setupLenis helper function
+* 1.2.0 Added getProgressFromSceneTime and scrollToSceneTime for scene-time based navigation
 */
 
 if ("HypeStickyScroll" in window === false) {
@@ -200,6 +201,31 @@ if ("HypeStickyScroll" in window === false) {
 				return Math.ceil(scrollPosition);
 			};
 
+			// Get progress from scene name and time in scene
+			hypeDocument.getProgressFromSceneTime = function (sceneName, timeInScene) {
+				// Guard: if sceneInfo not ready, return 0
+				if (!hypeDocument.sceneInfo || hypeDocument.sceneInfo.length === 0) return 0;
+
+				const sceneIndex = hypeDocument.sceneNames().indexOf(sceneName);
+				if (sceneIndex === -1) return 0; // Scene not found
+
+				let accumulatedTime = 0;
+
+				// Add all previous scenes' durations
+				for (let i = 0; i < sceneIndex; i++) {
+					accumulatedTime += hypeDocument.sceneInfo[i].duration;
+				}
+
+				// Add time within the target scene (clamped to scene duration)
+				const sceneDuration = hypeDocument.sceneInfo[sceneIndex].duration;
+				accumulatedTime += Math.max(0, Math.min(timeInScene, sceneDuration));
+
+				// Calculate total duration
+				const totalDuration = hypeDocument.sceneInfo.reduce((total, scene) => total + scene.duration, 0);
+
+				return accumulatedTime / totalDuration;
+			};
+
 			// Scroll to a progress value (0-1)
 			hypeDocument.scrollToProgress = function (progress, options = {}) {
 				// Default options (duration in seconds)
@@ -232,69 +258,69 @@ if ("HypeStickyScroll" in window === false) {
 					} else {
 						// Number = Fractional progress offset (0-1)
 						scrollPosition += parseFloat(offset) * (wrapperHeightWithoutPadding - window.innerHeight);
-			}
-		}
-
-		const lenis = getLenis();
-
-			// Instant scroll (no animation)
-			if (duration === 0) {
-				if (lenis) {
-					lenis.scrollTo(scrollPosition, { immediate: true });
-					// Force scroll handler to refresh screen after immediate Lenis scroll
-					requestAnimationFrame(() => {
-						window.dispatchEvent(new Event('scroll'));
-					});
-				} else {
-					window.scrollTo({
-						top: scrollPosition,
-						behavior: 'auto'
-					});
-				}
-			} else {
-				if (lenis) {
-					// Use Lenis smooth scroll (duration in seconds)
-					let finalDuration = duration;
-					if (duration === "auto") {
-						const distance = Math.abs(scrollPosition - getScrollY());
-						finalDuration = distance / getDefault('autoScrollSpeed') / 1000; // Convert ms to seconds
 					}
-					lenis.scrollTo(scrollPosition, {
-						duration: finalDuration,
-						easing: easing === 'linear' ? (t) => t : 
+				}
+
+				const lenis = getLenis();
+
+				// Instant scroll (no animation)
+				if (duration === 0) {
+					if (lenis) {
+						lenis.scrollTo(scrollPosition, { immediate: true });
+						// Force scroll handler to refresh screen after immediate Lenis scroll
+						requestAnimationFrame(() => {
+							window.dispatchEvent(new Event('scroll'));
+						});
+					} else {
+						window.scrollTo({
+							top: scrollPosition,
+							behavior: 'auto'
+						});
+					}
+				} else {
+					if (lenis) {
+						// Use Lenis smooth scroll (duration in seconds)
+						let finalDuration = duration;
+						if (duration === "auto") {
+							const distance = Math.abs(scrollPosition - getScrollY());
+							finalDuration = distance / getDefault('autoScrollSpeed') / 1000; // Convert ms to seconds
+						}
+						lenis.scrollTo(scrollPosition, {
+							duration: finalDuration,
+							easing: easing === 'linear' ? (t) => t :
 								easing === 'in' ? (t) => t * t :
-								easing === 'out' ? (t) => t * (2 - t) :
-								(t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
-					});
-				} else {
-					// Animated scroll with easing (native - convert seconds to ms)
-					const start = performance.now();
-					const startPosition = window.scrollY;
-					const distance = scrollPosition - startPosition;
+									easing === 'out' ? (t) => t * (2 - t) :
+										(t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+						});
+					} else {
+						// Animated scroll with easing (native - convert seconds to ms)
+						const start = performance.now();
+						const startPosition = window.scrollY;
+						const distance = scrollPosition - startPosition;
 
-				// Calculate final duration in ms (auto = configured speed factor)
-				let finalDuration = duration * 1000; // Convert seconds to milliseconds
-				if (duration === "auto") {
-					finalDuration = Math.abs(distance) / getDefault('autoScrollSpeed');
-				}
+						// Calculate final duration in ms (auto = configured speed factor)
+						let finalDuration = duration * 1000; // Convert seconds to milliseconds
+						if (duration === "auto") {
+							finalDuration = Math.abs(distance) / getDefault('autoScrollSpeed');
+						}
 
-				// Animation loop
-				requestAnimationFrame(function step(timestamp) {
-					const progressValue = Math.min((timestamp - start) / finalDuration, 1);
-					const easedProgress = applyEasing(progressValue, easing);
-					const currentScrollPosition = startPosition + (distance * easedProgress);
-					window.scrollTo({
-						top: currentScrollPosition
-					});
+						// Animation loop
+						requestAnimationFrame(function step(timestamp) {
+							const progressValue = Math.min((timestamp - start) / finalDuration, 1);
+							const easedProgress = applyEasing(progressValue, easing);
+							const currentScrollPosition = startPosition + (distance * easedProgress);
+							window.scrollTo({
+								top: currentScrollPosition
+							});
 
-					// Continue animation until complete
-					if (progressValue < 1) {
-						requestAnimationFrame(step);
+							// Continue animation until complete
+							if (progressValue < 1) {
+								requestAnimationFrame(step);
+							}
+						});
 					}
-				});
-			}
-		}
-	};
+				}
+			};
 
 			// Defer DOM modifications to avoid conflicts with other extensions
 			requestAnimationFrame(function () {
@@ -434,69 +460,84 @@ if ("HypeStickyScroll" in window === false) {
 					} else {
 						// Number = Fractional progress offset (0-1)
 						scrollPosition += parseFloat(offset) * (wrapperHeightWithoutPadding - window.innerHeight);
-			}
-		}
-
-		const lenis = getLenis();
-
-		// Instant scroll (no animation)
-		if (duration === 0) {
-			if (lenis) {
-				lenis.scrollTo(scrollPosition, { immediate: true });
-				// Force scroll handler to refresh screen after immediate Lenis scroll
-				requestAnimationFrame(() => {
-					window.dispatchEvent(new Event('scroll'));
-				});
-			} else {
-				window.scrollTo({
-					top: scrollPosition,
-					behavior: 'auto'
-				});
-			}
-		} else {
-			if (lenis) {
-				// Use Lenis smooth scroll (duration in seconds)
-				let finalDuration = duration;
-				if (duration === "auto") {
-					const distance = Math.abs(scrollPosition - getScrollY());
-					finalDuration = distance / getDefault('autoScrollSpeed') / 1000; // Convert ms to seconds
-				}
-				lenis.scrollTo(scrollPosition, {
-					duration: finalDuration,
-					easing: easing === 'linear' ? (t) => t :
-							easing === 'in' ? (t) => t * t :
-							easing === 'out' ? (t) => t * (2 - t) :
-							(t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
-				});
-			} else {
-				// Animated scroll with easing (native - convert seconds to ms)
-				const start = performance.now();
-				const startPosition = window.scrollY;
-				const distance = scrollPosition - startPosition;
-
-				// Calculate final duration in ms (auto = configured speed factor)
-				let finalDuration = duration * 1000; // Convert seconds to milliseconds
-				if (duration === "auto") {
-					finalDuration = Math.abs(distance) / getDefault('autoScrollSpeed');
-				}
-
-				// Animation loop
-				requestAnimationFrame(function step(timestamp) {
-					const progress = Math.min((timestamp - start) / finalDuration, 1);
-					const easedProgress = applyEasing(progress, easing);
-					const currentScrollPosition = startPosition + (distance * easedProgress);
-					window.scrollTo({
-						top: currentScrollPosition
-					});
-
-					// Continue animation until complete
-					if (progress < 1) {
-						requestAnimationFrame(step);
 					}
-				});
-			}
-		}
-	};
+				}
+
+				const lenis = getLenis();
+
+				// Instant scroll (no animation)
+				if (duration === 0) {
+					if (lenis) {
+						lenis.scrollTo(scrollPosition, { immediate: true });
+						// Force scroll handler to refresh screen after immediate Lenis scroll
+						requestAnimationFrame(() => {
+							window.dispatchEvent(new Event('scroll'));
+						});
+					} else {
+						window.scrollTo({
+							top: scrollPosition,
+							behavior: 'auto'
+						});
+					}
+				} else {
+					if (lenis) {
+						// Use Lenis smooth scroll (duration in seconds)
+						let finalDuration = duration;
+						if (duration === "auto") {
+							const distance = Math.abs(scrollPosition - getScrollY());
+							finalDuration = distance / getDefault('autoScrollSpeed') / 1000; // Convert ms to seconds
+						}
+						lenis.scrollTo(scrollPosition, {
+							duration: finalDuration,
+							easing: easing === 'linear' ? (t) => t :
+								easing === 'in' ? (t) => t * t :
+									easing === 'out' ? (t) => t * (2 - t) :
+										(t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+						});
+					} else {
+						// Animated scroll with easing (native - convert seconds to ms)
+						const start = performance.now();
+						const startPosition = window.scrollY;
+						const distance = scrollPosition - startPosition;
+
+						// Calculate final duration in ms (auto = configured speed factor)
+						let finalDuration = duration * 1000; // Convert seconds to milliseconds
+						if (duration === "auto") {
+							finalDuration = Math.abs(distance) / getDefault('autoScrollSpeed');
+						}
+
+						// Animation loop
+						requestAnimationFrame(function step(timestamp) {
+							const progress = Math.min((timestamp - start) / finalDuration, 1);
+							const easedProgress = applyEasing(progress, easing);
+							const currentScrollPosition = startPosition + (distance * easedProgress);
+							window.scrollTo({
+								top: currentScrollPosition
+							});
+
+							// Continue animation until complete
+							if (progress < 1) {
+								requestAnimationFrame(step);
+							}
+						});
+					}
+				}
+			};
+
+			// Scroll to a specific time in a scene
+			hypeDocument.scrollToSceneTime = function (sceneName, timeInScene, options = {}) {
+				// Guard: if sceneInfo not ready, retry next frame
+				if (!hypeDocument.sceneInfo || hypeDocument.sceneInfo.length === 0) {
+					requestAnimationFrame(() => hypeDocument.scrollToSceneTime(sceneName, timeInScene, options));
+					return;
+				}
+
+				// Get progress from scene + time
+				const progress = hypeDocument.getProgressFromSceneTime(sceneName, timeInScene);
+
+				// Use existing scrollToProgress
+				hypeDocument.scrollToProgress(progress, options);
+			};
 
 			function applyEasing(t, easing) {
 				switch (easing) {
@@ -587,7 +628,7 @@ if ("HypeStickyScroll" in window === false) {
 		 * @property {String} version Version of the extension
 		 */
 		var HypeStickyScroll = {
-			version: '1.1.0',
+			version: '1.2.0',
 			getDefault: getDefault,
 			setDefault: setDefault,
 			setupLenis: setupLenis,
