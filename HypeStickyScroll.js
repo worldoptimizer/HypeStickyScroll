@@ -1,6 +1,6 @@
 /*!
-Hype Sticky Scroll 1.0.5
-Copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
+Hype Sticky Scroll 1.1.0
+Copyright (c) 2022-2025 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 
 /*
@@ -11,13 +11,27 @@ Copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.0.3 Added function callbacks stickyScrollBefore and stickyScrollAfter
 * 1.0.4 HypeDocumentLoad set to push on HYPE_eventListeners (instead of unshift)
 * 1.0.5 Added getScrollFromProgress
+* 1.0.6 Added scrollToProgress, refactored scrollToSceneStart with options object and offset support
+* 1.0.7 Deferred DOM setup with requestAnimationFrame, added guard patterns to prevent extension conflicts
+* 1.0.8 Added autoScrollSpeed setting and improved scroll animation comments
+* 1.0.9 Changed duration parameter from milliseconds to seconds for consistency
+* 1.1.0 Added Lenis smooth scroll support with auto-detection and setupLenis helper function
 */
 
-if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (function () {
+if ("HypeStickyScroll" in window === false) {
+	window['HypeStickyScroll'] = (function () {
 		// defaults
 		let _default = {
 			ignoreSceneSymbol: '🔒',
 			wrapperHeight: 5000,
+			autoScrollSpeed: 1, // Speed factor in thousands of pixels per second (1 = 1000px/s, 2 = 2000px/s, 0.5 = 500px/s)
+			lenis: false, // Enable Lenis smooth scroll integration
+			lenisOptions: { // Default Lenis configuration
+				duration: 1.2,
+				easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+				direction: 'vertical',
+				smooth: true
+			}
 		};
 		/**
 		 * This function allows to override a global default by key or if a object is given as key to override all default at once
@@ -51,6 +65,57 @@ if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (func
 		}
 
 		/**
+		 * Get the Lenis instance if available
+		 * @returns {Object|null} The Lenis instance or null
+		 */
+		function getLenis() {
+			return window.lenis || null;
+		}
+
+		/**
+		 * Get current scroll position (Lenis-aware)
+		 * @returns {number} Current scroll position
+		 */
+		function getScrollY() {
+			const lenis = getLenis();
+			return lenis ? lenis.animatedScroll : window.scrollY;
+		}
+
+		/**
+		 * Setup Lenis smooth scroll (helper function for non-technical users)
+		 * @param {Object} options Optional Lenis configuration
+		 * @returns {Object} The Lenis instance
+		 */
+		function setupLenis(options = {}) {
+			// Check if Lenis library is loaded
+			if (typeof Lenis === 'undefined') {
+				console.error('HypeStickyScroll: Lenis library not found. Please load Lenis before calling setupLenis()');
+				return null;
+			}
+
+			// Merge user options with defaults
+			const lenisOptions = Object.assign({}, getDefault('lenisOptions'), options);
+
+			// Create Lenis instance
+			const lenis = new Lenis(lenisOptions);
+
+			// Setup RAF loop
+			function raf(time) {
+				lenis.raf(time);
+				requestAnimationFrame(raf);
+			}
+			requestAnimationFrame(raf);
+
+			// Store globally for detection
+			window.lenis = lenis;
+
+			// Enable Lenis mode
+			setDefault('lenis', true);
+
+			return lenis;
+		}
+
+		/**
 		 * Returns the running sticky setup
 		 * @param {any} hypeDocument - The Hype document object.
 		 * @returns {any} The running sticky setup.
@@ -66,9 +131,9 @@ if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (func
 		 * @param {any} hypeDocument - The Hype document object.
 		 */
 		function HypeDocumentLoad(hypeDocument, element, event) {
-			// Add wrapper and get variables
-			const wrapperElm = makeSticky(document.getElementById(hypeDocument.documentId()));
-			const stickyElm = document.querySelector('.sticky');
+			// Store references that will be set after DOM setup
+			let wrapperElm = null;
+			let stickyElm = null;
 
 			// Set the timer id, start and end values for the scroll position, total length of all hypeDocument.sceneInfo,
 			// scene names, current scene name, and create an array to store the scene info
@@ -83,24 +148,45 @@ if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (func
 
 			// enable the sticky scroll
 			hypeDocument.enableStickyScroll = function (height) {
+				// Guard: if dependency not ready, retry next frame
+				if (!wrapperElm) {
+					requestAnimationFrame(() => hypeDocument.enableStickyScroll(height));
+					return;
+				}
+
 				if (hypeDocument.isStickyScrollRunning) return;
-				wrapperElm.style.height = height ? height + 'px' : getDefault('wrapperHeight')+'px';
+				wrapperElm.style.height = height ? height + 'px' : getDefault('wrapperHeight') + 'px';
 				hypeDocument.isStickyScrollRunning = true;
 				requestAnimationFrame(function () {
-					window.addEventListener('scroll', scrollHandler);
-					// Call it initially
-					window.dispatchEvent(new Event('scroll'));
+					const lenis = getLenis();
+					if (lenis) {
+						// Use Lenis scroll event
+						lenis.on('scroll', scrollHandler);
+					} else {
+						// Use native scroll
+						window.addEventListener('scroll', scrollHandler);
+						// Call it initially
+						window.dispatchEvent(new Event('scroll'));
+					}
 				});
 			};
 
 			// disable the sticky scroll
 			hypeDocument.disableStickyScroll = function () {
 				hypeDocument.isStickyScrollRunning = false;
-				window.removeEventListener('scroll', scrollHandler);
+				const lenis = getLenis();
+				if (lenis) {
+					lenis.off('scroll', scrollHandler);
+				} else {
+					window.removeEventListener('scroll', scrollHandler);
+				}
 			};
 
 			// Get the progress of the scroll
 			hypeDocument.getProgress = function () {
+				// Guard: if dependencies not ready, return 0
+				if (!stickyElm || !wrapperElm) return 0;
+
 				return getProgress(stickyElm, wrapperElm);
 			};
 
@@ -114,25 +200,127 @@ if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (func
 				return Math.ceil(scrollPosition);
 			};
 
+			// Scroll to a progress value (0-1)
+			hypeDocument.scrollToProgress = function (progress, options = {}) {
+				// Default options (duration in seconds)
+				const {
+					duration = 0,
+					easing = 'inout',
+					offset = 0
+				} = options;
 
-			// Loop through the scene names, show the scene, get the duration of the timeline,
-			// add the duration to the total length, add the scene info to the array
-			for (let i = 0; i < sceneNames.length; i++) {
-				hypeDocument.showSceneNamed(sceneNames[i]);
-				const duration = hypeDocument.durationForTimelineNamed('timelineName');
-				totalLength += duration;
-				hypeDocument.sceneInfo.push({
-					name: sceneNames[i],
-					duration: duration,
-					layouts: hypeDocument.layoutsForSceneNamed(sceneNames[i])
+				// Clamp progress between 0 and 1
+				progress = Math.max(0, Math.min(1, progress));
+
+				// Get the scroll position for this progress value
+				let scrollPosition = hypeDocument.getScrollFromProgress(progress);
+
+				// Apply offset (fractional 0-1, percentage string, or pixel string)
+				if (offset !== 0) {
+					const wrapper = document.querySelector('.wrapper');
+					const wrapperStyle = getComputedStyle(wrapper);
+					const wrapperPaddingTop = parseFloat(wrapperStyle.paddingTop);
+					const wrapperHeightWithoutPadding = wrapper.clientHeight - (wrapperPaddingTop + parseFloat(wrapperStyle.paddingBottom));
+
+					if (typeof offset === 'string' && offset.endsWith('%')) {
+						// Percentage offset
+						const percentValue = parseFloat(offset) / 100;
+						scrollPosition += percentValue * (wrapperHeightWithoutPadding - window.innerHeight);
+					} else if (typeof offset === 'string' && offset.endsWith('px')) {
+						// Pixel offset
+						scrollPosition += parseFloat(offset);
+					} else {
+						// Number = Fractional progress offset (0-1)
+						scrollPosition += parseFloat(offset) * (wrapperHeightWithoutPadding - window.innerHeight);
+			}
+		}
+
+		const lenis = getLenis();
+
+			// Instant scroll (no animation)
+			if (duration === 0) {
+				if (lenis) {
+					lenis.scrollTo(scrollPosition, { immediate: true });
+					// Force scroll handler to refresh screen after immediate Lenis scroll
+					requestAnimationFrame(() => {
+						window.dispatchEvent(new Event('scroll'));
+					});
+				} else {
+					window.scrollTo({
+						top: scrollPosition,
+						behavior: 'auto'
+					});
+				}
+			} else {
+				if (lenis) {
+					// Use Lenis smooth scroll (duration in seconds)
+					let finalDuration = duration;
+					if (duration === "auto") {
+						const distance = Math.abs(scrollPosition - getScrollY());
+						finalDuration = distance / getDefault('autoScrollSpeed') / 1000; // Convert ms to seconds
+					}
+					lenis.scrollTo(scrollPosition, {
+						duration: finalDuration,
+						easing: easing === 'linear' ? (t) => t : 
+								easing === 'in' ? (t) => t * t :
+								easing === 'out' ? (t) => t * (2 - t) :
+								(t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+					});
+				} else {
+					// Animated scroll with easing (native - convert seconds to ms)
+					const start = performance.now();
+					const startPosition = window.scrollY;
+					const distance = scrollPosition - startPosition;
+
+				// Calculate final duration in ms (auto = configured speed factor)
+				let finalDuration = duration * 1000; // Convert seconds to milliseconds
+				if (duration === "auto") {
+					finalDuration = Math.abs(distance) / getDefault('autoScrollSpeed');
+				}
+
+				// Animation loop
+				requestAnimationFrame(function step(timestamp) {
+					const progressValue = Math.min((timestamp - start) / finalDuration, 1);
+					const easedProgress = applyEasing(progressValue, easing);
+					const currentScrollPosition = startPosition + (distance * easedProgress);
+					window.scrollTo({
+						top: currentScrollPosition
+					});
+
+					// Continue animation until complete
+					if (progressValue < 1) {
+						requestAnimationFrame(step);
+					}
 				});
 			}
+		}
+	};
 
-			// Revert back to the (initial) current scene, set the handler
-			hypeDocument.showSceneNamed(currentScene);
+			// Defer DOM modifications to avoid conflicts with other extensions
+			requestAnimationFrame(function () {
+				// Add wrapper and get variables
+				wrapperElm = makeSticky(document.getElementById(hypeDocument.documentId()));
+				stickyElm = document.querySelector('.sticky');
 
-			// Stop setup returns
-			delete(hypeDocument.runningStickySetup);
+				// Loop through the scene names, show the scene, get the duration of the timeline,
+				// add the duration to the total length, add the scene info to the array
+				for (let i = 0; i < sceneNames.length; i++) {
+					hypeDocument.showSceneNamed(sceneNames[i]);
+					const duration = hypeDocument.durationForTimelineNamed('timelineName');
+					totalLength += duration;
+					hypeDocument.sceneInfo.push({
+						name: sceneNames[i],
+						duration: duration,
+						layouts: hypeDocument.layoutsForSceneNamed(sceneNames[i])
+					});
+				}
+
+				// Revert back to the (initial) current scene, set the handler
+				hypeDocument.showSceneNamed(currentScene);
+
+				// Stop setup returns
+				delete (hypeDocument.runningStickySetup);
+			});
 
 			// Setup scroll handler
 			function scrollHandler() {
@@ -205,8 +393,20 @@ if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (func
 				});
 			}
 
-			// Get the progress of the scroll
-			hypeDocument.scrollToSceneStart = function (sceneName, duration = 0, easing = 'linear') {
+			// Scroll to the start of a scene
+			hypeDocument.scrollToSceneStart = function (sceneName, options = {}) {
+				// Guard: if sceneInfo not ready, retry next frame
+				if (!hypeDocument.sceneInfo || hypeDocument.sceneInfo.length === 0) {
+					requestAnimationFrame(() => hypeDocument.scrollToSceneStart(sceneName, options));
+					return;
+				}
+
+				// Default options (duration in seconds)
+				const {
+					duration = 0,
+					easing = 'linear',
+					offset = 0
+				} = options;
 
 				const sceneIndex = hypeDocument.sceneNames().indexOf(sceneName);
 				let accumulatedDuration = 0;
@@ -220,37 +420,83 @@ if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (func
 				const wrapperStyle = getComputedStyle(wrapper);
 				const wrapperPaddingTop = parseFloat(wrapperStyle.paddingTop);
 				const wrapperHeightWithoutPadding = wrapper.clientHeight - (wrapperPaddingTop + parseFloat(wrapperStyle.paddingBottom));
-				const scrollPosition = Math.ceil((accumulatedDuration / totalDuration) * (wrapperHeightWithoutPadding - window.innerHeight) + wrapperPaddingTop);
+				let scrollPosition = Math.ceil((accumulatedDuration / totalDuration) * (wrapperHeightWithoutPadding - window.innerHeight) + wrapperPaddingTop);
 
-				if (duration === 0) {
-					window.scrollTo({
-						top: scrollPosition,
-						behavior: 'auto'
-					});
-				} else {
-					const start = performance.now();
-					const startPosition = window.scrollY;
-					const distance = scrollPosition - startPosition;
+				// Apply offset (fractional 0-1, percentage string, or pixel string)
+				if (offset !== 0) {
+					if (typeof offset === 'string' && offset.endsWith('%')) {
+						// Percentage offset
+						const percentValue = parseFloat(offset) / 100;
+						scrollPosition += percentValue * (wrapperHeightWithoutPadding - window.innerHeight);
+					} else if (typeof offset === 'string' && offset.endsWith('px')) {
+						// Pixel offset
+						scrollPosition += parseFloat(offset);
+					} else {
+						// Number = Fractional progress offset (0-1)
+						scrollPosition += parseFloat(offset) * (wrapperHeightWithoutPadding - window.innerHeight);
+			}
+		}
 
-					if (duration === "auto") {
-						duration = Math.abs(distance);
-					}
+		const lenis = getLenis();
 
-					requestAnimationFrame(function step(timestamp) {
-						const progress = Math.min((timestamp - start) / duration, 1);
-						const easedProgress = applyEasing(progress, easing);
-						const currentScrollPosition = startPosition + (distance * easedProgress);
-						window.scrollTo({
-							top: currentScrollPosition
-						});
-
-						if (progress < 1) {
-							requestAnimationFrame(step);
-						} 
-					});
-
+		// Instant scroll (no animation)
+		if (duration === 0) {
+			if (lenis) {
+				lenis.scrollTo(scrollPosition, { immediate: true });
+				// Force scroll handler to refresh screen after immediate Lenis scroll
+				requestAnimationFrame(() => {
+					window.dispatchEvent(new Event('scroll'));
+				});
+			} else {
+				window.scrollTo({
+					top: scrollPosition,
+					behavior: 'auto'
+				});
+			}
+		} else {
+			if (lenis) {
+				// Use Lenis smooth scroll (duration in seconds)
+				let finalDuration = duration;
+				if (duration === "auto") {
+					const distance = Math.abs(scrollPosition - getScrollY());
+					finalDuration = distance / getDefault('autoScrollSpeed') / 1000; // Convert ms to seconds
 				}
-			};
+				lenis.scrollTo(scrollPosition, {
+					duration: finalDuration,
+					easing: easing === 'linear' ? (t) => t :
+							easing === 'in' ? (t) => t * t :
+							easing === 'out' ? (t) => t * (2 - t) :
+							(t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+				});
+			} else {
+				// Animated scroll with easing (native - convert seconds to ms)
+				const start = performance.now();
+				const startPosition = window.scrollY;
+				const distance = scrollPosition - startPosition;
+
+				// Calculate final duration in ms (auto = configured speed factor)
+				let finalDuration = duration * 1000; // Convert seconds to milliseconds
+				if (duration === "auto") {
+					finalDuration = Math.abs(distance) / getDefault('autoScrollSpeed');
+				}
+
+				// Animation loop
+				requestAnimationFrame(function step(timestamp) {
+					const progress = Math.min((timestamp - start) / finalDuration, 1);
+					const easedProgress = applyEasing(progress, easing);
+					const currentScrollPosition = startPosition + (distance * easedProgress);
+					window.scrollTo({
+						top: currentScrollPosition
+					});
+
+					// Continue animation until complete
+					if (progress < 1) {
+						requestAnimationFrame(step);
+					}
+				});
+			}
+		}
+	};
 
 			function applyEasing(t, easing) {
 				switch (easing) {
@@ -267,8 +513,8 @@ if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (func
 		}
 
 		if ("HYPE_eventListeners" in window === false) { window.HYPE_eventListeners = Array(); }
-		window.HYPE_eventListeners.push({type: "HypeDocumentLoad", callback: HypeDocumentLoad});
-		window.HYPE_eventListeners.push({ type: "HypeSceneLoad", callback: HypeSceneLoad});
+		window.HYPE_eventListeners.push({ type: "HypeDocumentLoad", callback: HypeDocumentLoad });
+		window.HYPE_eventListeners.push({ type: "HypeSceneLoad", callback: HypeSceneLoad });
 
 		/**
 		 * Makes an element sticky.
@@ -341,9 +587,10 @@ if ("HypeStickyScroll" in window === false) { window['HypeStickyScroll'] = (func
 		 * @property {String} version Version of the extension
 		 */
 		var HypeStickyScroll = {
-			version: '1.0.5',
+			version: '1.1.0',
 			getDefault: getDefault,
 			setDefault: setDefault,
+			setupLenis: setupLenis,
 		};
 
 		/**

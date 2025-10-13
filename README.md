@@ -5,15 +5,17 @@ Introducing Hype Sticky Scroll, a powerful and versatile tool that unlocks the p
 
 Key features include:
 
-* Scene filtering and ignoring: Choose which scenes to include or exclude from the sticky scroll animation (just add 🔒 to the scene name).
-* Customizable wrapper height: Adjust the height of the wrapper to fit your content and design.
-* Function callbacks: Implement custom behaviors with the stickyScrollBefore and stickyScrollAfter callbacks.
-* Progress tracking: Monitor the scroll progress and use it to control the playback of your animations (easier method in the works).
-* Smooth scene navigation: Scroll to specific scenes with ease, complete with customizable durations and easing options.
+* **Scene filtering and ignoring**: Choose which scenes to include or exclude from the sticky scroll animation (just add 🔒 to the scene name).
+* **Customizable wrapper height**: Adjust the height of the wrapper to fit your content and design.
+* **Function callbacks**: Implement custom behaviors with the stickyScrollBefore and stickyScrollAfter callbacks.
+* **Progress tracking**: Monitor the scroll progress and control playback of your animations.
+* **Smooth scene navigation**: Scroll to specific scenes or progress values with customizable durations, easing, and offsets.
+* **Lenis smooth scroll integration**: Optional support for buttery-smooth scrolling with Lenis library.
+* **Auto-scroll speed control**: Configurable automatic scroll duration based on distance.
 
 ## Content Delivery Network (CDN)
 Latest version can be linked into your project using the following in the head section of your project:
-```
+```html
 <script src="https://cdn.jsdelivr.net/gh/worldoptimizer/HypeStickyScroll/HypeStickyScroll.min.js"></script>
 ```
 
@@ -67,30 +69,147 @@ hypeDocument.getProgress();
 
 This function returns a value between 0 and 1, representing the scroll progress.
 
-**Q: How can I scroll to the start of a scene?**
+**Q: How can I scroll to a specific progress value?**
 
-A: You can scroll to the start of a scene by calling the `scrollToSceneStart` function on the Hype document object like this:
+A: You can scroll to a specific progress value (0-1) using the `scrollToProgress` function:
 
 ```javascript
-hypeDocument.scrollToSceneStart(sceneName, duration, easing);
+// Instant scroll to 50% progress
+hypeDocument.scrollToProgress(0.5);
+
+// Animated scroll with options (duration in seconds)
+hypeDocument.scrollToProgress(0.5, {
+    duration: 1.5,        // 1.5 seconds
+    easing: 'inout',      // 'linear', 'in', 'out', 'inout'
+    offset: 0.1           // Additional 10% offset (also accepts '10%' or '50px')
+});
+
+// Auto-duration based on distance
+hypeDocument.scrollToProgress(0.8, {
+    duration: 'auto',     // Duration calculated by distance * autoScrollSpeed
+    easing: 'out'
+});
 ```
 
-Replace `sceneName` with the name of the scene you want to scroll to, `duration` with the desired scroll duration in milliseconds (use 0 for instant scrolling), and `easing` with the desired easing function ('linear', 'in', 'out', 'inout').
+**Q: How can I scroll to the start of a scene?**
 
+A: You can scroll to the start of a scene using the `scrollToSceneStart` function with an options object:
+
+```javascript
+// Instant scroll
+hypeDocument.scrollToSceneStart('Scene 2');
+
+// Animated scroll with options (duration in seconds)
+hypeDocument.scrollToSceneStart('Scene 2', {
+    duration: 2,          // 2 seconds
+    easing: 'inout',      // 'linear', 'in', 'out', 'inout'
+    offset: '5%'          // Offset by 5% (also accepts 0.05 or '50px')
+});
+
+// Auto-duration based on distance
+hypeDocument.scrollToSceneStart('Scene 3', {
+    duration: 'auto'
+});
+```
+
+**Q: How do I use Lenis smooth scrolling?**
+
+A: First, load the Lenis library, then use the simple setup function:
+
+```html
+<!-- Load Lenis library -->
+<script src="https://unpkg.com/lenis@latest/dist/lenis.min.js"></script>
+
+<!-- Load Hype Sticky Scroll -->
+<script src="HypeStickyScroll.min.js"></script>
+
+<!-- Setup Lenis (in your Hype function or custom JavaScript) -->
+<script>
+    // Simple setup with defaults
+    HypeStickyScroll.setupLenis();
+
+    // Or with custom options
+    HypeStickyScroll.setupLenis({
+        duration: 1.5,
+        easing: (t) => t,
+        direction: 'vertical'
+    });
+</script>
+```
+
+The extension will automatically detect Lenis and use it for smooth scrolling. All `scrollToProgress` and `scrollToSceneStart` functions will work seamlessly with Lenis.
+
+**Q: How can I configure the auto-scroll speed?**
+
+A: You can set the `autoScrollSpeed` default to control how fast "auto" duration scrolls:
+
+```javascript
+// Default is 1 (1000px/s)
+HypeStickyScroll.setDefault('autoScrollSpeed', 2); // 2000px/s (faster)
+HypeStickyScroll.setDefault('autoScrollSpeed', 0.5); // 500px/s (slower)
+```
 
 ## Extended hypeDocument API
 
 | Command               | Description |
 |-----------------------|-------------|
-| `hypeDocument.enableStickyScroll`  | Enables the sticky scroll effect. |
-| `hypeDocument.disableStickyScroll` | Disables the sticky scroll effect. |
-| `hypeDocument.getProgress`         | Returns the current scroll progress. |
-| `hypeDocument.scrollToSceneStart`  | Scrolls to the start of a scene (duration, easing). You can use 'auto' for a distance base duration |
+| `hypeDocument.enableStickyScroll(height)`  | Enables the sticky scroll effect with specified wrapper height. |
+| `hypeDocument.disableStickyScroll()` | Disables the sticky scroll effect. |
+| `hypeDocument.getProgress()` | Returns the current scroll progress (0-1). |
+| `hypeDocument.getScrollFromProgress(progress)` | Returns the scroll position for a given progress value. |
+| `hypeDocument.scrollToProgress(progress, options)` | Scrolls to a specific progress value (0-1) with optional duration, easing, and offset. |
+| `hypeDocument.scrollToSceneStart(sceneName, options)` | Scrolls to the start of a scene with optional duration, easing, and offset. |
+
+### Options Object
+
+Both `scrollToProgress` and `scrollToSceneStart` accept an options object:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `duration` | Number or "auto" | 0 | Scroll duration in **seconds** (0 = instant, "auto" = distance-based) |
+| `easing` | String | 'inout' / 'linear' | Easing function: 'linear', 'in', 'out', 'inout' |
+| `offset` | Number or String | 0 | Additional offset: fractional (0.1), percentage ('10%'), or pixels ('50px') |
 
 ## HypeStickyScroll API
 
 | Command      | Description |
 |--------------|-------------|
-| `HypeStickyScroll.setDefault` | Sets a default value for a specified key or overrides all default values at once. |
-| `HypeStickyScroll.getDefault` | Returns the value of a default by key or all default values if no key is given. |
-| `HypeStickyScroll.version`    | The version of the Hype Sticky Scroll extension. |
+| `HypeStickyScroll.setDefault(key, value)` | Sets a default value for a specified key or overrides all default values at once. |
+| `HypeStickyScroll.getDefault(key)` | Returns the value of a default by key or all default values if no key is given. |
+| `HypeStickyScroll.setupLenis(options)` | Simple helper to setup Lenis smooth scrolling (requires Lenis library). |
+| `HypeStickyScroll.version` | The version of the Hype Sticky Scroll extension. |
+
+### Available Defaults
+
+| Default | Type | Default Value | Description |
+|---------|------|---------------|-------------|
+| `ignoreSceneSymbol` | String | '🔒' | Symbol to exclude scenes from sticky scroll |
+| `wrapperHeight` | Number | 5000 | Default wrapper height in pixels |
+| `autoScrollSpeed` | Number | 1 | Speed factor in thousands of pixels per second (1 = 1000px/s) |
+| `lenis` | Boolean | false | Enable Lenis smooth scroll integration |
+| `lenisOptions` | Object | {...} | Default Lenis configuration options |
+
+### Examples
+
+```javascript
+// Change the ignore symbol
+HypeStickyScroll.setDefault('ignoreSceneSymbol', '⛔');
+
+// Set default wrapper height
+HypeStickyScroll.setDefault('wrapperHeight', 8000);
+
+// Configure auto-scroll speed
+HypeStickyScroll.setDefault('autoScrollSpeed', 2); // 2000px/s
+
+// Customize Lenis options
+HypeStickyScroll.setDefault('lenisOptions', {
+    duration: 2,
+    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+    direction: 'vertical',
+    smooth: true
+});
+```
+
+---
+
+**Copyright (c) 2022-2025 Max Ziebell. MIT License.**
