@@ -1,0 +1,21 @@
+# Node modules
+node_modules/
+
+# Temporary build files
+.temp_*.txt
+.temp_*.js
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Closure Compiler JAR (optional)
+closure-compiler.jar
+
