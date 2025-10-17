@@ -1,5 +1,5 @@
 /*!
-Hype Sticky Scroll 1.2.0
+Hype Sticky Scroll 1.3.0
 Copyright (c) 2022-2025 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 
@@ -17,6 +17,7 @@ Copyright (c) 2022-2025 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.0.9 Changed duration parameter from milliseconds to seconds for consistency
 * 1.1.0 Added Lenis smooth scroll support with auto-detection and setupLenis helper function
 * 1.2.0 Added getProgressFromSceneTime and scrollToSceneTime for scene-time based navigation
+* 1.3.0 Added scene focus with setSceneFocus/clearSceneFocus, snapToBoundaries option, and viewportHeightUnit option
 */
 
 if ("HypeStickyScroll" in window === false) {
@@ -26,6 +27,8 @@ if ("HypeStickyScroll" in window === false) {
 			ignoreSceneSymbol: '🔒',
 			wrapperHeight: 5000,
 			autoScrollSpeed: 1, // Speed factor in thousands of pixels per second (1 = 1000px/s, 2 = 2000px/s, 0.5 = 500px/s)
+			snapToBoundaries: true, // Enable scroll snapping to scene boundaries when focus is active
+			viewportHeightUnit: 'dvh', // Viewport height unit for sticky element (dvh, vh, svh, lvh)
 			lenis: false, // Enable Lenis smooth scroll integration
 			lenisOptions: { // Default Lenis configuration
 				duration: 1.2,
@@ -146,6 +149,7 @@ if ("HypeStickyScroll" in window === false) {
 
 			// Set the tracking variables
 			hypeDocument.runningStickySetup = false;
+			hypeDocument.focusedScene = null;
 
 			// enable the sticky scroll
 			hypeDocument.enableStickyScroll = function (height) {
@@ -181,6 +185,16 @@ if ("HypeStickyScroll" in window === false) {
 				} else {
 					window.removeEventListener('scroll', scrollHandler);
 				}
+			};
+
+			// Set scene focus (lock to a specific scene)
+			hypeDocument.setSceneFocus = function (sceneName) {
+				hypeDocument.focusedScene = sceneName;
+			};
+
+			// Clear scene focus (resume normal scrolling)
+			hypeDocument.clearSceneFocus = function () {
+				hypeDocument.focusedScene = null;
 			};
 
 			// Get the progress of the scroll
@@ -348,6 +362,29 @@ if ("HypeStickyScroll" in window === false) {
 				delete (hypeDocument.runningStickySetup);
 			});
 
+			// Helper function to get scene boundaries
+			function getSceneBoundaries(sceneName) {
+				const sceneIndex = hypeDocument.sceneNames().indexOf(sceneName);
+				if (sceneIndex === -1) return null;
+
+				let accumulatedDuration = 0;
+				for (let i = 0; i < sceneIndex; i++) {
+					accumulatedDuration += hypeDocument.sceneInfo[i].duration;
+				}
+
+				const sceneDuration = hypeDocument.sceneInfo[sceneIndex].duration;
+				const totalDuration = hypeDocument.sceneInfo.reduce((t, s) => t + s.duration, 0);
+
+				return {
+					sceneIndex: sceneIndex,
+					startProgress: accumulatedDuration / totalDuration,
+					endProgress: (accumulatedDuration + sceneDuration) / totalDuration,
+					startTime: accumulatedDuration,
+					endTime: accumulatedDuration + sceneDuration,
+					duration: sceneDuration
+				};
+			}
+
 			// Setup scroll handler
 			function scrollHandler() {
 
@@ -356,6 +393,23 @@ if ("HypeStickyScroll" in window === false) {
 
 				// Set the scroll position, calculate the percentage, calculate the current time
 				const percentage = getProgress(stickyElm, wrapperElm);
+
+				// Handle scene focus scroll clamping
+				if (hypeDocument.focusedScene && getDefault('snapToBoundaries')) {
+					const boundaries = getSceneBoundaries(hypeDocument.focusedScene);
+					if (boundaries) {
+						// If scrolled before scene start, jump to scene start
+						if (percentage < boundaries.startProgress) {
+							hypeDocument.scrollToProgress(boundaries.startProgress, { duration: 0 });
+							return;
+						}
+						// If scrolled after scene end, jump to scene end
+						if (percentage > boundaries.endProgress) {
+							hypeDocument.scrollToProgress(boundaries.endProgress, { duration: 0 });
+							return;
+						}
+					}
+				}
 
 				const currentTime = percentage * totalLength;
 
@@ -379,8 +433,33 @@ if ("HypeStickyScroll" in window === false) {
 					}
 				}
 
+				// If loop completed without breaking, we're at the last scene
+				if (currentTimeInScene <= currentTime) {
+					currentScene = hypeDocument.sceneInfo.length - 1;
+					scene = hypeDocument.sceneInfo[currentScene];
+				}
+
 				// Calculate the time
-				const time = currentTime - (currentTimeInScene - scene.duration);
+				let time = currentTime - (currentTimeInScene - scene.duration);
+
+				// Handle scene focus
+				if (hypeDocument.focusedScene) {
+					const focusedSceneIndex = hypeDocument.sceneInfo.findIndex(s => s.name === hypeDocument.focusedScene);
+					if (focusedSceneIndex !== -1) {
+						if (currentScene < focusedSceneIndex) {
+							// Before focused scene - lock to first frame
+							currentScene = focusedSceneIndex;
+							scene = hypeDocument.sceneInfo[focusedSceneIndex];
+							time = 0;
+						} else if (currentScene > focusedSceneIndex) {
+							// After focused scene - lock to last frame
+							currentScene = focusedSceneIndex;
+							scene = hypeDocument.sceneInfo[focusedSceneIndex];
+							time = scene.duration;
+						}
+						// If currentScene === focusedSceneIndex, use calculated time (normal behavior)
+					}
+				}
 
 				// Clear the timer id
 				cancelAnimationFrame(rAF);
@@ -573,7 +652,8 @@ if ("HypeStickyScroll" in window === false) {
 			element.style.position = 'sticky';
 			element.classList.add('sticky');
 			element.style.top = '0px';
-			element.style.height = element.style.height.replace('%', 'dvh');
+			const viewportUnit = getDefault('viewportHeightUnit');
+			element.style.height = element.style.height.replace('%', viewportUnit);
 			const style = document.createElement('style');
 			style.innerHTML = '#' + element.id + ' { height: ' + element.style.height + ' !important; }';
 			document.head.appendChild(style);
@@ -610,7 +690,6 @@ if ("HypeStickyScroll" in window === false) {
 
 			const windowHeight = window.innerHeight;
 
-
 			if (stickyBottom < wrapperTop) {
 				return 0;
 			} else if (stickyTop > wrapperBottom) {
@@ -628,7 +707,7 @@ if ("HypeStickyScroll" in window === false) {
 		 * @property {String} version Version of the extension
 		 */
 		var HypeStickyScroll = {
-			version: '1.2.0',
+			version: '1.3.0',
 			getDefault: getDefault,
 			setDefault: setDefault,
 			setupLenis: setupLenis,
