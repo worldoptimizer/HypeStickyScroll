@@ -573,7 +573,7 @@ if ("HypeStickyScroll" in window === false) {
 			element.style.position = 'sticky';
 			element.classList.add('sticky');
 			element.style.top = '0px';
-			element.style.height = element.style.height.replace('%', 'vh');
+			element.style.height = element.style.height.replace('%', 'dvh');
 			const style = document.createElement('style');
 			style.innerHTML = '#' + element.id + ' { height: ' + element.style.height + ' !important; }';
 			document.head.appendChild(style);
