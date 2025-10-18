@@ -206,7 +206,9 @@ if ("HypeStickyScroll" in window === false) {
 			};
 
 			hypeDocument.getScrollFromProgress = function (progress) {
-				const wrapperElm = document.querySelector('.wrapper');
+				// Guard: if dependencies not ready, return 0
+				if (!wrapperElm) return 0;
+
 				const wrapperStyle = getComputedStyle(wrapperElm);
 				const wrapperPaddingTop = parseFloat(wrapperStyle.paddingTop);
 				const wrapperHeightWithoutPadding = wrapperElm.clientHeight - (wrapperPaddingTop + parseFloat(wrapperStyle.paddingBottom));
@@ -220,7 +222,7 @@ if ("HypeStickyScroll" in window === false) {
 				// Guard: if sceneInfo not ready, return 0
 				if (!hypeDocument.sceneInfo || hypeDocument.sceneInfo.length === 0) return 0;
 
-				const sceneIndex = hypeDocument.sceneNames().indexOf(sceneName);
+				const sceneIndex = hypeDocument.sceneInfo.findIndex(s => s.name === sceneName);
 				if (sceneIndex === -1) return 0; // Scene not found
 
 				let accumulatedTime = 0;
@@ -257,10 +259,9 @@ if ("HypeStickyScroll" in window === false) {
 
 				// Apply offset (fractional 0-1, percentage string, or pixel string)
 				if (offset !== 0) {
-					const wrapper = document.querySelector('.wrapper');
-					const wrapperStyle = getComputedStyle(wrapper);
+					const wrapperStyle = getComputedStyle(wrapperElm);
 					const wrapperPaddingTop = parseFloat(wrapperStyle.paddingTop);
-					const wrapperHeightWithoutPadding = wrapper.clientHeight - (wrapperPaddingTop + parseFloat(wrapperStyle.paddingBottom));
+					const wrapperHeightWithoutPadding = wrapperElm.clientHeight - (wrapperPaddingTop + parseFloat(wrapperStyle.paddingBottom));
 
 					if (typeof offset === 'string' && offset.endsWith('%')) {
 						// Percentage offset
@@ -364,7 +365,7 @@ if ("HypeStickyScroll" in window === false) {
 
 			// Helper function to get scene boundaries
 			function getSceneBoundaries(sceneName) {
-				const sceneIndex = hypeDocument.sceneNames().indexOf(sceneName);
+				const sceneIndex = hypeDocument.sceneInfo.findIndex(s => s.name === sceneName);
 				if (sceneIndex === -1) return null;
 
 				let accumulatedDuration = 0;
@@ -513,7 +514,9 @@ if ("HypeStickyScroll" in window === false) {
 					offset = 0
 				} = options;
 
-				const sceneIndex = hypeDocument.sceneNames().indexOf(sceneName);
+				const sceneIndex = hypeDocument.sceneInfo.findIndex(s => s.name === sceneName);
+				if (sceneIndex === -1) return; // Scene not found
+
 				let accumulatedDuration = 0;
 
 				for (let i = 0; i < sceneIndex; i++) {
@@ -521,10 +524,9 @@ if ("HypeStickyScroll" in window === false) {
 				}
 
 				const totalDuration = hypeDocument.sceneInfo.reduce((total, scene) => total + scene.duration, 0);
-				const wrapper = document.querySelector('.wrapper');
-				const wrapperStyle = getComputedStyle(wrapper);
+				const wrapperStyle = getComputedStyle(wrapperElm);
 				const wrapperPaddingTop = parseFloat(wrapperStyle.paddingTop);
-				const wrapperHeightWithoutPadding = wrapper.clientHeight - (wrapperPaddingTop + parseFloat(wrapperStyle.paddingBottom));
+				const wrapperHeightWithoutPadding = wrapperElm.clientHeight - (wrapperPaddingTop + parseFloat(wrapperStyle.paddingBottom));
 				let scrollPosition = Math.ceil((accumulatedDuration / totalDuration) * (wrapperHeightWithoutPadding - window.innerHeight) + wrapperPaddingTop);
 
 				// Apply offset (fractional 0-1, percentage string, or pixel string)
@@ -697,6 +699,10 @@ if ("HypeStickyScroll" in window === false) {
 			} else {
 				const stickyOffset = stickyTop - wrapperTop;
 				const wrapperOffset = wrapperHeight - stickyHeight;
+
+				// Guard against division by zero when sticky fills wrapper
+				if (wrapperOffset === 0) return 0;
+
 				const progress = stickyOffset / wrapperOffset;
 				return progress;
 			}
