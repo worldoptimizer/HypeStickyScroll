@@ -28,6 +28,7 @@ if ("HypeStickyScroll" in window === false) {
 			wrapperHeight: 5000,
 			autoScrollSpeed: 1, // Speed factor in thousands of pixels per second (1 = 1000px/s, 2 = 2000px/s, 0.5 = 500px/s)
 			snapToBoundaries: true, // Enable scroll snapping to scene boundaries when focus is active
+			updateOnFocus: true, // Trigger scroll handler immediately when setting focus
 			viewportHeightUnit: 'dvh', // Viewport height unit for sticky element (dvh, vh, svh, lvh)
 			lenis: false, // Enable Lenis smooth scroll integration
 			lenisOptions: { // Default Lenis configuration
@@ -190,6 +191,10 @@ if ("HypeStickyScroll" in window === false) {
 			// Set scene focus (lock to a specific scene)
 			hypeDocument.setSceneFocus = function (sceneName) {
 				hypeDocument.focusedScene = sceneName;
+				// Trigger scroll handler to apply focus immediately
+				if (getDefault('updateOnFocus')) {
+					window.dispatchEvent(new Event('scroll'));
+				}
 			};
 
 			// Clear scene focus (resume normal scrolling)
