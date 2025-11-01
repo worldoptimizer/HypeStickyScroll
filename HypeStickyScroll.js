@@ -37,7 +37,15 @@ if ("HypeStickyScroll" in window === false) {
 				easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
 				direction: 'vertical',
 				smooth: true
-			}
+			},
+			snapPoints: [], // Default snap points configuration
+			snapTolerance: { // Default snap tolerance zones
+				before: 200,
+				after: 50
+			},
+			snapDelay: 1000, // Default snap delay in milliseconds
+			snapDuration: 'auto', // Default snap animation duration
+			snapEasing: 'inout' // Default snap easing
 		};
 		/**
 		 * This function allows to override a global default by key or if a object is given as key to override all default at once
@@ -219,17 +227,23 @@ if ("HypeStickyScroll" in window === false) {
 					return;
 				}
 
-				// Default configuration
+				// Merge with defaults
 				const config = {
-					snapPoints: options.snapPoints || [],
+					snapPoints: options.snapPoints || getDefault('snapPoints') || [],
 					tolerance: {
-						before: options.tolerance?.before ?? 200,
-						after: options.tolerance?.after ?? 50
+						before: options.tolerance?.before ?? getDefault('snapTolerance')?.before ?? 200,
+						after: options.tolerance?.after ?? getDefault('snapTolerance')?.after ?? 50
 					},
-					delay: options.delay ?? 1000,
-					duration: options.duration ?? 'auto',
-					easing: options.easing ?? 'inout'
+					delay: options.delay ?? getDefault('snapDelay') ?? 1000,
+					duration: options.duration ?? getDefault('snapDuration') ?? 'auto',
+					easing: options.easing ?? getDefault('snapEasing') ?? 'inout'
 				};
+
+				// Guard: Early return if no snap points provided
+				if (!config.snapPoints || config.snapPoints.length === 0) {
+					console.warn('HypeStickyScroll: setupScrollSnapping called without snap points. Snapping not enabled.');
+					return;
+				}
 
 				// Normalize snap points to include pixel positions
 				hypeDocument.snapPoints = config.snapPoints.map(point => {
@@ -434,6 +448,12 @@ if ("HypeStickyScroll" in window === false) {
 
 				// Revert back to the (initial) current scene, set the handler
 				hypeDocument.showSceneNamed(currentScene);
+
+				// Auto-initialize snap points from defaults if they exist
+				const defaultSnapPoints = getDefault('snapPoints');
+				if (defaultSnapPoints && defaultSnapPoints.length > 0) {
+					hypeDocument.setupScrollSnapping();
+				}
 
 				// Stop setup returns
 				delete (hypeDocument.runningStickySetup);

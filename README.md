@@ -11,6 +11,7 @@ Key features include:
 * **Progress tracking**: Monitor the scroll progress and control playback of your animations.
 * **Smooth scene navigation**: Scroll to specific scenes or progress values with customizable durations, easing, and offsets.
 * **Scene-time navigation**: Scroll to specific timeline positions within scenes for precise animation control.
+* **Scroll snapping**: Automatically snap to predefined points with configurable tolerance zones and timing.
 * **Lenis smooth scroll integration**: Optional support for buttery-smooth scrolling with Lenis library.
 * **Auto-scroll speed control**: Configurable automatic scroll duration based on distance.
 
@@ -174,6 +175,51 @@ HypeStickyScroll.setDefault('autoScrollSpeed', 2); // 2000px/s (faster)
 HypeStickyScroll.setDefault('autoScrollSpeed', 0.5); // 500px/s (slower)
 ```
 
+**Q: How do I setup scroll snapping?**
+
+A: Scroll snapping automatically snaps to predefined points after the user stops scrolling:
+
+```javascript
+// Setup snap points for specific scenes and times
+hypeDocument.setupScrollSnapping({
+    snapPoints: [
+        { scene: 'Intro', time: 0 },
+        { scene: 'Chapter 1', time: 0 },
+        { scene: 'Chapter 1', time: 2.5 },
+        { scene: 'Chapter 2', time: 0 }
+    ],
+    tolerance: {
+        before: 200,   // Snap within 200px before reaching point
+        after: 50      // Snap within 50px after passing point
+    },
+    delay: 1000,       // Wait 1s after scroll stops
+    duration: 'auto',  // Auto-calculate animation duration
+    easing: 'inout'
+});
+```
+
+You can also set default snap points globally that apply automatically:
+
+```javascript
+// Set defaults BEFORE Hype document loads
+HypeStickyScroll.setDefault('snapPoints', [
+    { scene: 'Intro', time: 0 },
+    { scene: 'Chapter 1', time: 0 },
+    { scene: 'Chapter 2', time: 0 }
+]);
+
+// Snap points automatically initialize when document loads
+// No need to call setupScrollSnapping()
+```
+
+Control snapping:
+```javascript
+hypeDocument.disableScrollSnapping();           // Disable
+hypeDocument.isScrollSnappingEnabled();         // Check status
+```
+
+**Note:** If `setupScrollSnapping()` is called without snap points (and no defaults are set), it will log a warning and return early without enabling snapping.
+
 ## Extended hypeDocument API
 
 | Command               | Description |
@@ -186,6 +232,9 @@ HypeStickyScroll.setDefault('autoScrollSpeed', 0.5); // 500px/s (slower)
 | `hypeDocument.scrollToProgress(progress, options)` | Scrolls to a specific progress value (0-1) with optional duration, easing, and offset. |
 | `hypeDocument.scrollToSceneStart(sceneName, options)` | Scrolls to the start of a scene with optional duration, easing, and offset. |
 | `hypeDocument.scrollToSceneTime(sceneName, timeInScene, options)` | Scrolls to a specific timeline time within a scene with optional duration, easing, and offset. |
+| `hypeDocument.setupScrollSnapping(options)` | Enables scroll snapping with snap points and configuration. |
+| `hypeDocument.disableScrollSnapping()` | Disables scroll snapping. |
+| `hypeDocument.isScrollSnappingEnabled()` | Returns true if scroll snapping is enabled. |
 
 ### Options Object
 
@@ -215,6 +264,11 @@ All scroll functions (`scrollToProgress`, `scrollToSceneStart`, and `scrollToSce
 | `autoScrollSpeed` | Number | 1 | Speed factor in thousands of pixels per second (1 = 1000px/s) |
 | `lenis` | Boolean | false | Enable Lenis smooth scroll integration |
 | `lenisOptions` | Object | {...} | Default Lenis configuration options |
+| `snapPoints` | Array | [] | Default snap points (auto-applied if set) |
+| `snapTolerance` | Object | {before: 200, after: 50} | Default snap tolerance zones in pixels |
+| `snapDelay` | Number | 1000 | Default snap delay in milliseconds |
+| `snapDuration` | Number/String | 'auto' | Default snap animation duration |
+| `snapEasing` | String | 'inout' | Default snap easing function |
 
 ### Examples
 
