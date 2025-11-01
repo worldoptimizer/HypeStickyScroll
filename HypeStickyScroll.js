@@ -1,5 +1,5 @@
 /*!
-Hype Sticky Scroll 1.3.0
+Hype Sticky Scroll 1.4.0
 Copyright (c) 2022-2025 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 
@@ -18,6 +18,7 @@ Copyright (c) 2022-2025 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.1.0 Added Lenis smooth scroll support with auto-detection and setupLenis helper function
 * 1.2.0 Added getProgressFromSceneTime and scrollToSceneTime for scene-time based navigation
 * 1.3.0 Added scene focus with setSceneFocus/clearSceneFocus, snapToBoundaries option, and viewportHeightUnit option
+* 1.4.0 Added scroll snapping with setupScrollSnapping, scene-time based snap points, and asymmetric tolerance zones
 */
 
 if ("HypeStickyScroll" in window === false) {
@@ -152,6 +153,14 @@ if ("HypeStickyScroll" in window === false) {
 			hypeDocument.runningStickySetup = false;
 			hypeDocument.focusedScene = null;
 
+			// Snap point tracking variables
+			hypeDocument.snapEnabled = false;
+			hypeDocument.snapPoints = [];
+			hypeDocument.snapConfig = null;
+			hypeDocument.snapTimeout = null;
+			hypeDocument.lastScrollY = 0;
+			hypeDocument.scrollVelocity = 0;
+
 			// enable the sticky scroll
 			hypeDocument.enableStickyScroll = function (height) {
 				// Guard: if dependency not ready, retry next frame
@@ -200,6 +209,68 @@ if ("HypeStickyScroll" in window === false) {
 			// Clear scene focus (resume normal scrolling)
 			hypeDocument.clearSceneFocus = function () {
 				hypeDocument.focusedScene = null;
+			};
+
+			// Setup scroll snapping
+			hypeDocument.setupScrollSnapping = function (options = {}) {
+				// Guard: if sceneInfo not ready, retry next frame
+				if (!hypeDocument.sceneInfo || hypeDocument.sceneInfo.length === 0) {
+					requestAnimationFrame(() => hypeDocument.setupScrollSnapping(options));
+					return;
+				}
+
+				// Default configuration
+				const config = {
+					snapPoints: options.snapPoints || [],
+					tolerance: {
+						before: options.tolerance?.before ?? 200,
+						after: options.tolerance?.after ?? 50
+					},
+					delay: options.delay ?? 1000,
+					duration: options.duration ?? 'auto',
+					easing: options.easing ?? 'inout'
+				};
+
+				// Normalize snap points to include pixel positions
+				hypeDocument.snapPoints = config.snapPoints.map(point => {
+					// Resolve 'end' keyword to scene duration
+					let resolvedTime = point.time;
+					if (point.time === 'end') {
+						const sceneInfo = hypeDocument.sceneInfo.find(s => s.name === point.scene);
+						resolvedTime = sceneInfo ? sceneInfo.duration : 0;
+					}
+					
+					const progress = hypeDocument.getProgressFromSceneTime(point.scene, resolvedTime);
+					const scrollY = hypeDocument.getScrollFromProgress(progress);
+					
+					return {
+						scene: point.scene,
+						time: resolvedTime,
+						progress: progress,
+						scrollY: scrollY,
+						tolerance: {
+							before: point.tolerance?.before ?? config.tolerance.before,
+							after: point.tolerance?.after ?? config.tolerance.after
+						}
+					};
+				});
+
+				hypeDocument.snapConfig = config;
+				hypeDocument.snapEnabled = true;
+			};
+
+			// Disable scroll snapping
+			hypeDocument.disableScrollSnapping = function () {
+				hypeDocument.snapEnabled = false;
+				if (hypeDocument.snapTimeout) {
+					clearTimeout(hypeDocument.snapTimeout);
+					hypeDocument.snapTimeout = null;
+				}
+			};
+
+			// Check if snapping is enabled
+			hypeDocument.isScrollSnappingEnabled = function () {
+				return hypeDocument.snapEnabled;
 			};
 
 			// Get the progress of the scroll
@@ -399,6 +470,52 @@ if ("HypeStickyScroll" in window === false) {
 
 				// Set the scroll position, calculate the percentage, calculate the current time
 				const percentage = getProgress(stickyElm, wrapperElm);
+
+				// Handle scroll snapping
+				if (hypeDocument.snapEnabled && hypeDocument.snapPoints.length > 0) {
+					const currentScrollY = getScrollY();
+					
+					// Calculate scroll velocity
+					hypeDocument.scrollVelocity = Math.abs(currentScrollY - hypeDocument.lastScrollY);
+					hypeDocument.lastScrollY = currentScrollY;
+
+					// Clear existing snap timeout
+					if (hypeDocument.snapTimeout) {
+						clearTimeout(hypeDocument.snapTimeout);
+						hypeDocument.snapTimeout = null;
+					}
+
+					// Set new snap timeout
+					hypeDocument.snapTimeout = setTimeout(() => {
+						// Find nearest snap point within tolerance
+						let nearestSnapPoint = null;
+						let minDistance = Infinity;
+
+						for (const snapPoint of hypeDocument.snapPoints) {
+							const distance = currentScrollY - snapPoint.scrollY;
+							const absDistance = Math.abs(distance);
+							
+							// Check if within tolerance zone
+							// distance > 0 means we're past the snap point (scrolled down beyond it)
+							// distance < 0 means we're before the snap point (haven't reached it yet)
+							const isPastSnapPoint = distance > 0;
+							const tolerance = isPastSnapPoint ? snapPoint.tolerance.after : snapPoint.tolerance.before;
+							
+							if (absDistance <= tolerance && absDistance < minDistance) {
+								minDistance = absDistance;
+								nearestSnapPoint = snapPoint;
+							}
+						}
+
+						// Snap to nearest point if found
+						if (nearestSnapPoint) {
+							hypeDocument.scrollToProgress(nearestSnapPoint.progress, {
+								duration: hypeDocument.snapConfig.duration,
+								easing: hypeDocument.snapConfig.easing
+							});
+						}
+					}, hypeDocument.snapConfig.delay);
+				}
 
 				// Handle scene focus scroll clamping
 				if (hypeDocument.focusedScene && getDefault('snapToBoundaries')) {
@@ -718,7 +835,7 @@ if ("HypeStickyScroll" in window === false) {
 		 * @property {String} version Version of the extension
 		 */
 		var HypeStickyScroll = {
-			version: '1.3.0',
+			version: '1.4.0',
 			getDefault: getDefault,
 			setDefault: setDefault,
 			setupLenis: setupLenis,
