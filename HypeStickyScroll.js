@@ -1,5 +1,5 @@
 /*!
-Hype Sticky Scroll 1.4.0
+Hype Sticky Scroll 1.4.1
 Copyright (c) 2022-2025 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 
@@ -19,6 +19,7 @@ Copyright (c) 2022-2025 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.2.0 Added getProgressFromSceneTime and scrollToSceneTime for scene-time based navigation
 * 1.3.0 Added scene focus with setSceneFocus/clearSceneFocus, snapToBoundaries option, and viewportHeightUnit option
 * 1.4.0 Added scroll snapping with setupScrollSnapping, scene-time based snap points, and asymmetric tolerance zones
+* 1.4.1 Added visual debug mode with snap point visualization, overlap detection, and current scene/time display
 */
 
 if ("HypeStickyScroll" in window === false) {
@@ -45,7 +46,8 @@ if ("HypeStickyScroll" in window === false) {
 			},
 			snapDelay: 1000, // Default snap delay in milliseconds
 			snapDuration: 'auto', // Default snap animation duration
-			snapEasing: 'inout' // Default snap easing
+			snapEasing: 'inout', // Default snap easing
+			debug: false // Enable visual debugging (snap points + scroll position)
 		};
 		/**
 		 * This function allows to override a global default by key or if a object is given as key to override all default at once
@@ -54,9 +56,9 @@ if ("HypeStickyScroll" in window === false) {
 		 * @param {String|Function|Object} value This is the value to set for the key
 		 */
 		function setDefault(key, value) {
-			//allow setting all defaults
+			//allow setting multiple defaults
 			if (typeof (key) == 'object') {
-				_default = key;
+				_default = Object.assign({}, _default, key);
 				return;
 			}
 
@@ -130,6 +132,89 @@ if ("HypeStickyScroll" in window === false) {
 		}
 
 		/**
+		 * Create debug visualization overlay
+		 */
+		function createDebugOverlay() {
+			if (document.getElementById('hype-sticky-debug')) return;
+
+			const overlay = document.createElement('div');
+			overlay.id = 'hype-sticky-debug';
+			overlay.style.cssText = `
+				position: fixed;
+				right: 20px;
+				top: 0;
+				width: 40px;
+				height: 100vh;
+				pointer-events: none;
+				z-index: 999999;
+			`;
+			document.body.appendChild(overlay);
+			return overlay;
+		}
+
+		/**
+		 * Update debug visualization
+		 */
+		function updateDebugVisualization(hypeDocument, currentScrollY, wrapperHeight, currentSceneName, currentTime) {
+			const overlay = document.getElementById('hype-sticky-debug');
+			if (!overlay) return;
+
+			let html = '';
+
+			// Show snap points with simplified visualization
+			if (hypeDocument.snapPoints) {
+				hypeDocument.snapPoints.forEach((snapPoint, index) => {
+					const snapPercent = (snapPoint.scrollY / (wrapperHeight - window.innerHeight)) * 100;
+					const beforePercent = ((snapPoint.scrollY - snapPoint.tolerance.before) / (wrapperHeight - window.innerHeight)) * 100;
+					const afterPercent = ((snapPoint.scrollY + snapPoint.tolerance.after) / (wrapperHeight - window.innerHeight)) * 100;
+
+					// Check if current position is within tolerance
+					const distance = currentScrollY - snapPoint.scrollY;
+					const absDistance = Math.abs(distance);
+					const isPastSnapPoint = distance > 0;
+					const tolerance = isPastSnapPoint ? snapPoint.tolerance.after : snapPoint.tolerance.before;
+					const isInRange = absDistance <= tolerance;
+
+					// Check for overlaps with next snap point
+					let hasOverlap = false;
+					if (index < hypeDocument.snapPoints.length - 1) {
+						const nextSnapPoint = hypeDocument.snapPoints[index + 1];
+						const currentAfter = snapPoint.scrollY + snapPoint.tolerance.after;
+						const nextBefore = nextSnapPoint.scrollY - nextSnapPoint.tolerance.before;
+						hasOverlap = currentAfter > nextBefore;
+					}
+
+					// Simplified tolerance zone - just a thin line showing the range
+					const zoneColor = hasOverlap ? '#ff6600' : (isInRange ? '#00ff00' : '#666666');
+					const zoneOpacity = hasOverlap ? '0.3' : (isInRange ? '0.6' : '0.4');
+					html += `<div style="position: absolute; top: ${beforePercent}%; right: 8px; width: 3px; height: ${afterPercent - beforePercent}%; background: ${zoneColor}; opacity: ${zoneOpacity};"></div>`;
+
+					// Snap point marker - larger, cleaner dot
+					const dotColor = hasOverlap ? '#ff6600' : (isInRange ? '#00ff00' : '#00ff00');
+					const dotSize = isInRange ? '12px' : '8px';
+					html += `<div style="position: absolute; top: ${snapPercent}%; right: ${isInRange ? '5px' : '7px'}; width: ${dotSize}; height: ${dotSize}; background: ${dotColor}; border: 2px solid rgba(0,0,0,0.8); border-radius: 50%; box-shadow: 0 0 8px ${dotColor}; transform: translateY(-50%);"></div>`;
+
+					// Cleaner label - only show on hover or when active
+					if (isInRange || hasOverlap) {
+						html += `<div style="position: absolute; top: ${snapPercent}%; right: 25px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 11px; font-weight: 500; color: ${hasOverlap ? '#ff6600' : '#00ff00'}; background: rgba(0,0,0,0.85); padding: 4px 8px; border-radius: 4px; white-space: nowrap; transform: translateY(-50%); box-shadow: 0 2px 8px rgba(0,0,0,0.3);">${snapPoint.time}s${hasOverlap ? ' ⚠️' : ''}</div>`;
+					}
+				});
+			}
+
+			// Show current scroll position indicator (white line with better styling)
+			const scrollPercent = (currentScrollY / (wrapperHeight - window.innerHeight)) * 100;
+			html += `<div style="position: absolute; top: ${scrollPercent}%; right: 0; width: 20px; height: 3px; background: white; box-shadow: 0 0 8px rgba(255,255,255,0.8); border-radius: 2px;"></div>`;
+			
+			// Add label with current scene and time
+			if (currentSceneName && currentTime !== undefined) {
+				const timeFormatted = currentTime.toFixed(1);
+				html += `<div style="position: absolute; top: ${scrollPercent}%; right: 25px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 11px; font-weight: 500; color: white; background: rgba(0,0,0,0.85); padding: 4px 8px; border-radius: 4px; white-space: nowrap; transform: translateY(-50%); box-shadow: 0 2px 8px rgba(0,0,0,0.3);">${currentSceneName} ${timeFormatted}s</div>`;
+			}
+
+			overlay.innerHTML = html;
+		}
+
+		/**
 		 * Returns the running sticky setup
 		 * @param {any} hypeDocument - The Hype document object.
 		 * @returns {any} The running sticky setup.
@@ -169,6 +254,20 @@ if ("HypeStickyScroll" in window === false) {
 			hypeDocument.lastScrollY = 0;
 			hypeDocument.scrollVelocity = 0;
 
+			// Initialize debug visualization
+			function initDebugVisualization() {
+				createDebugOverlay();
+				// Trigger a scroll event to populate the debug visualization immediately
+				requestAnimationFrame(() => {
+					const lenis = getLenis();
+					if (lenis) {
+						lenis.emit();
+					} else {
+						window.dispatchEvent(new Event('scroll'));
+					}
+				});
+			}
+
 			// enable the sticky scroll
 			hypeDocument.enableStickyScroll = function (height) {
 				// Guard: if dependency not ready, retry next frame
@@ -190,6 +289,12 @@ if ("HypeStickyScroll" in window === false) {
 						window.addEventListener('scroll', scrollHandler);
 						// Call it initially
 						window.dispatchEvent(new Event('scroll'));
+					}
+
+					// Auto-initialize snap points from defaults if they exist
+					const defaultSnapPoints = getDefault('snapPoints');
+					if (defaultSnapPoints && defaultSnapPoints.length > 0 && !hypeDocument.snapEnabled) {
+						hypeDocument.setupScrollSnapping();
 					}
 				});
 			};
@@ -240,10 +345,7 @@ if ("HypeStickyScroll" in window === false) {
 				};
 
 				// Guard: Early return if no snap points provided
-				if (!config.snapPoints || config.snapPoints.length === 0) {
-					console.warn('HypeStickyScroll: setupScrollSnapping called without snap points. Snapping not enabled.');
-					return;
-				}
+				if (!config.snapPoints || config.snapPoints.length === 0) return;
 
 				// Normalize snap points to include pixel positions
 				hypeDocument.snapPoints = config.snapPoints.map(point => {
@@ -271,6 +373,11 @@ if ("HypeStickyScroll" in window === false) {
 
 				hypeDocument.snapConfig = config;
 				hypeDocument.snapEnabled = true;
+
+				// Initialize debug visualization if enabled
+				if (getDefault('debug')) {
+					initDebugVisualization();
+				}
 			};
 
 			// Disable scroll snapping
@@ -337,7 +444,7 @@ if ("HypeStickyScroll" in window === false) {
 				// Default options (duration in seconds)
 				const {
 					duration = 0,
-					easing = 'inout',
+					easing = 'linear',
 					offset = 0
 				} = options;
 
@@ -448,12 +555,6 @@ if ("HypeStickyScroll" in window === false) {
 
 				// Revert back to the (initial) current scene, set the handler
 				hypeDocument.showSceneNamed(currentScene);
-
-				// Auto-initialize snap points from defaults if they exist
-				const defaultSnapPoints = getDefault('snapPoints');
-				if (defaultSnapPoints && defaultSnapPoints.length > 0) {
-					hypeDocument.setupScrollSnapping();
-				}
 
 				// Stop setup returns
 				delete (hypeDocument.runningStickySetup);
@@ -602,6 +703,12 @@ if ("HypeStickyScroll" in window === false) {
 						}
 						// If currentScene === focusedSceneIndex, use calculated time (normal behavior)
 					}
+				}
+
+				// Update debug visualization
+				if (getDefault('debug')) {
+					const currentScrollY = getScrollY();
+					updateDebugVisualization(hypeDocument, currentScrollY, wrapperElm.clientHeight, scene.name, time);
 				}
 
 				// Clear the timer id
@@ -855,7 +962,7 @@ if ("HypeStickyScroll" in window === false) {
 		 * @property {String} version Version of the extension
 		 */
 		var HypeStickyScroll = {
-			version: '1.4.0',
+			version: '1.4.1',
 			getDefault: getDefault,
 			setDefault: setDefault,
 			setupLenis: setupLenis,

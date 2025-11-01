@@ -218,7 +218,33 @@ hypeDocument.disableScrollSnapping();           // Disable
 hypeDocument.isScrollSnappingEnabled();         // Check status
 ```
 
-**Note:** If `setupScrollSnapping()` is called without snap points (and no defaults are set), it will log a warning and return early without enabling snapping.
+**Note:** If `setupScrollSnapping()` is called without snap points (and no defaults are set), it will return early without enabling snapping.
+
+**Q: How do I debug snap points visually?**
+
+A: Enable debug mode to see a clean visual indicator on the right side of the screen:
+
+```javascript
+// Enable debug visualization
+HypeStickyScroll.setDefault('debug', true);
+```
+
+**Debug visualization shows:**
+- **White horizontal line**: Your current scroll position with scene name and time (e.g., "Persona 12.5s")
+- **Green dots**: Snap point locations (larger when you're near them)
+- **Thin vertical lines**: Tolerance zones
+  - Green = you're in snap range (will snap when you stop scrolling)
+  - Gray = inactive
+  - Orange = **overlapping tolerance zones** (conflict - see below)
+- **Time labels**: Only shown when active or overlapping
+- **⚠️ Warning**: Indicates overlapping snap points
+
+**What are overlaps?** When tolerance zones of consecutive snap points overlap, both points could try to snap you simultaneously. For example:
+- Snap point at 12s with `after: 400` extends to position X
+- Snap point at 16s with `before: 400` starts before position X
+- The overlapping area (orange) means both points are "fighting" for control
+
+**How to fix overlaps:** Reduce tolerance values or increase spacing between snap points.
 
 ## Extended hypeDocument API
 
@@ -269,6 +295,7 @@ All scroll functions (`scrollToProgress`, `scrollToSceneStart`, and `scrollToSce
 | `snapDelay` | Number | 1000 | Default snap delay in milliseconds |
 | `snapDuration` | Number/String | 'auto' | Default snap animation duration |
 | `snapEasing` | String | 'inout' | Default snap easing function |
+| `debug` | Boolean | false | Enable visual debugging (snap points + scroll position) |
 
 ### Examples
 
@@ -289,6 +316,9 @@ HypeStickyScroll.setDefault('lenisOptions', {
     direction: 'vertical',
     smooth: true
 });
+
+// Enable debug visualization
+HypeStickyScroll.setDefault('debug', true);
 ```
 
 ---
